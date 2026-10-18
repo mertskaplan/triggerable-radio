@@ -21,7 +21,7 @@ Ev sunucunuzda (Ubuntu / Debian tabanlı herhangi bir sistemde) Docker üzerinde
 - **Taşınabilir Docker Mimarisi:**
   - Ubuntu 26.04 LTS (ve PipeWire kullanan diğer güncel Ubuntu/Debian sürümleri) için tasarlanmıştır.
   - Host'un BlueZ (D-Bus) ve PipeWire ses sunucusunu kullanır; **kullanıcı oturumu açılmadan**, bilgisayar açılır açılmaz çalışır.
-  - `docker compose` ile ya da **Portainer Stack** olarak kurulabilir.
+  - Hazır imaj [Docker Hub](https://hub.docker.com/r/mertskaplan/triggerable-radio)'da; `docker compose` ile ya da **Portainer Stack** olarak derleme yapmadan kurulur.
 - **Tüm Ayarlar Docker Compose Üzerinden:**
   - Port, MAC adresi, yeniden bağlanma aralığı, radyo adresi ve diğer tüm parametreler `docker-compose.yml` veya `.env` üzerinden değiştirilebilir.
 - **Şık Web Kontrol Paneli (`http://localhost:8836`):**
@@ -45,8 +45,9 @@ triggerable-radio/
 │   └── templates/
 │       └── index.html      # Web kontrol paneli şablonu
 ├── Dockerfile              # BlueZ, mpv, pactl ve Python ortamı
-├── docker-compose.yml      # Docker Compose dosyası (imajı kaynaktan derler)
-├── portainer-stack.yml     # Docker Hub imajını kullanan stack dosyası (Portainer Web editor)
+├── docker-compose.yml      # Docker Compose / Portainer stack dosyası (Docker Hub imajı)
+├── docker-compose.build.yml # İmajı yerel kaynaktan derlemek için ek compose dosyası
+├── DOCKERHUB.md            # Docker Hub sayfasının tanıtım metni
 ├── host-setup.sh           # Host sunucu kurulum betiği (ilk kurulumda BİR KEZ çalıştırılır)
 ├── .env.example            # Örnek yapılandırma dosyası (.env olarak kopyalanır)
 ├── .env                    # Yerel ayarlar (git'e gönderilmez)
@@ -75,12 +76,19 @@ sudo systemctl enable --now docker
 sudo usermod -aG docker $USER   # sudo'suz docker için; ardından oturumu kapatıp açın
 ```
 
-### 1. Projeyi Hedef Cihaza İndirin
+### 1. Dosyaları Hedef Cihaza İndirin
+
+İmaj Docker Hub'dan çekildiği için kaynak kodun tamamına gerek yoktur; üç dosya yeterlidir:
 
 ```bash
-git clone https://github.com/mertskaplan/triggerable-radio.git
-cd triggerable-radio
+mkdir -p ~/triggerable-radio && cd ~/triggerable-radio
+BASE=https://raw.githubusercontent.com/mertskaplan/triggerable-radio/main
+curl -fsSLO $BASE/docker-compose.yml
+curl -fsSLO $BASE/host-setup.sh
+curl -fsSL  $BASE/.env.example -o .env.example
 ```
+
+Alternatif olarak depoyu klonlayabilirsiniz: `git clone https://github.com/mertskaplan/triggerable-radio.git && cd triggerable-radio`
 
 ### 2. Ayarları Yapılandırın (`.env`)
 
@@ -100,7 +108,7 @@ nano .env   # En azından BT_DEVICE_MAC değerini kendi hoparlörünüze göre a
 | `AUTO_START_RADIO` | `false` | Konteyner başlar başlamaz radyonun çalması |
 | `AUDIO_OUTPUT` | `pulse` | mpv ses çıkış sürücüsü |
 | `DEFAULT_VOLUME` | `30` | Hoparlörün açılıştaki ses seviyesi (yüzde 0-100). Sonrasında hoparlörün düğmeleriyle değiştirilebilir |
-| `IMAGE_TAG` | `latest` | Docker Hub imaj sürümü (yalnızca `portainer-stack.yml`) |
+| `IMAGE_TAG` | `latest` | Docker Hub imaj sürümü (örn. `1.0`) |
 | `HOST_UID` | `1000` | Host'ta PipeWire'ı çalıştıran kullanıcının UID'si (`id -u`). `host-setup.sh` otomatik yazar |
 
 ### 3. Host Kurulumu (Bir Kez Yapılır)
@@ -145,17 +153,10 @@ ls -l /run/user/$(id -u)/pulse/native                     # PipeWire-Pulse soket
 
 ### 5. Konteyneri Başlatın
 
-Hazır imajı Docker Hub'dan çekerek (önerilen):
+İmaj Docker Hub'dan çekilir:
 
 ```bash
-docker compose -f portainer-stack.yml --env-file .env up -d
-docker compose -f portainer-stack.yml logs -f
-```
-
-Ya da imajı kaynaktan derleyerek:
-
-```bash
-docker compose up -d --build
+docker compose up -d
 docker compose logs -f
 ```
 
@@ -182,6 +183,20 @@ curl http://<SUNUCU_IP>:8836/radio/start
 ```
 
 Konteyner `restart: unless-stopped` ile Docker açılınca başlar; ses soketi henüz hazır değilse 120 saniyeye kadar bekler.
+
+### Güncelleme
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+### Kaynaktan Derleme (Geliştiriciler İçin)
+
+Depoyu klonladıktan sonra imajı Docker Hub yerine yerel kaynaktan derlemek için:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
 
 ---
 
@@ -302,16 +317,14 @@ docker run -d --name portainer --restart=always \
   portainer/portainer-ce:lts
 ```
 
-Ardından `https://<SUNUCU_IP>:9443` adresinden yönetici hesabını oluşturun ve **local** ortamı seçin. Stack iki yöntemle kurulabilir:
+Ardından `https://<SUNUCU_IP>:9443` adresinden yönetici hesabını oluşturun ve **local** ortamı seçin. Her iki yöntemde de imaj [Docker Hub](https://hub.docker.com/r/mertskaplan/triggerable-radio)'dan çekilir; derleme gerekmez.
 
-### Yöntem A — Web editor (Docker Hub imajı, önerilen)
-
-Hazır imaj [Docker Hub](https://hub.docker.com/r/mertskaplan/triggerable-radio)'dan çekilir; hedef cihazda derleme gerekmez.
+### Yöntem A — Web editor
 
 1. **Stacks** → **Add stack**
 2. **Name**: `triggerable-radio`
 3. **Build method**: **Web editor**
-4. [`portainer-stack.yml`](portainer-stack.yml) dosyasının içeriğini editöre yapıştırın.
+4. [`docker-compose.yml`](docker-compose.yml) dosyasının içeriğini editöre yapıştırın.
 5. **Environment variables** bölümünde değişkenleri ekleyin (**Advanced mode** ile toplu yapıştırabilirsiniz). Verilmeyenler için varsayılan değerler kullanılır; en azından şunları girin:
 
    ```env
@@ -324,9 +337,9 @@ Hazır imaj [Docker Hub](https://hub.docker.com/r/mertskaplan/triggerable-radio)
 
 > Yeni sürüme geçmek için stack'i açıp **Update the stack** düğmesine basın ve **Re-pull image** seçeneğini işaretleyin.
 
-### Yöntem B — Repository (Git deposundan derleme)
+### Yöntem B — Repository (GitHub'dan)
 
-Portainer depoyu GitHub'dan çekip imajı kendisi derler:
+Portainer compose dosyasını doğrudan GitHub deposundan okur; depoda compose dosyası değiştiğinde stack kolayca güncellenir:
 
 1. **Stacks** → **Add stack**
 2. **Name**: `triggerable-radio`
@@ -337,7 +350,7 @@ Portainer depoyu GitHub'dan çekip imajı kendisi derler:
 7. **Environment variables**: Yöntem A'daki gibi `HOST_UID`, `BT_DEVICE_MAC` vb. ekleyin. `.env` dosyası genellikle depoya eklenmediği için değişkenler burada tanımlanmalıdır.
 8. **Deploy the stack**
 
-> Depodaki değişiklikleri almak için stack sayfasında **Pull and redeploy** kullanın.
+> Güncellemek için stack sayfasında **Pull and redeploy** kullanın ve **Re-pull image** seçeneğini işaretleyin.
 
 ### Portainer Notları
 

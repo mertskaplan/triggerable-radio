@@ -1,10 +1,17 @@
+# ==========================================================
+# Triggerable Radio — Docker Compose
+# ==========================================================
+# İmaj Docker Hub'dan çekilir: mertskaplan/triggerable-radio
+#   docker compose up -d
+# Ayarlar aynı klasördeki .env dosyasından (veya Portainer'daki
+# "Environment variables" bölümünden) okunur.
+# Kaynaktan derlemek için: docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# Kurulumdan önce host'ta bir kez: sudo ./host-setup.sh
+# ==========================================================
 services:
   triggerable-radio:
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: triggerable-radio
-    image: mertskaplan/triggerable-radio:latest
+    image: mertskaplan/triggerable-radio:${IMAGE_TAG:-latest}
     restart: unless-stopped
 
     # host network modu Bluetooth ve düşük gecikmeli ses için gereklidir

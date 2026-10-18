@@ -9,5 +9,6 @@
 .claude
 README.md
 LICENSE
-portainer-stack.yml
+docker-compose*.yml
+DOCKERHUB.md
 host-setup.sh
