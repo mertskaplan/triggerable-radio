@@ -1,0 +1,66 @@
+services:
+  triggerable-radio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: triggerable-radio
+    image: triggerable-radio:latest
+    restart: unless-stopped
+
+    # host network modu Bluetooth ve düşük gecikmeli ses için gereklidir
+    network_mode: "host"
+
+    # Host D-Bus ve Bluetooth donanım erişimi için
+    privileged: true
+
+    environment:
+      # Sunucu Portu
+      - PORT=${PORT:-8836}
+
+      # Bağlanılacak Bluetooth Hoparlörün MAC Adresi
+      - BT_DEVICE_MAC=${BT_DEVICE_MAC:-AA:BB:CC:DD:EE:FF}
+
+      # Bluetooth bağlantı koptuğunda yeniden deneme aralığı (saniye)
+      - BT_RECONNECT_INTERVAL=${BT_RECONNECT_INTERVAL:-15}
+
+      # Konteyner açıldığında hoparlöre otomatik bağlanma
+      - AUTO_CONNECT_BT=${AUTO_CONNECT_BT:-true}
+
+      # Bluetooth bağlantısı sağlandığında (kopup geri geldiğinde) radyoyu otomatik devam ettirme
+      - AUTO_RESUME_ON_BT=${AUTO_RESUME_ON_BT:-true}
+
+      # Oynatılacak radyo akışı (Doğrudan MP3 canlı akış bağlantısı önerilir)
+      - STREAM_URL=${STREAM_URL:-https://radyoilef.ankara.edu.tr/live}
+
+      # Konteyner başladığında radyonun otomatik başlaması (varsayılan: false, GET istekleriyle kontrol edilir)
+      - AUTO_START_RADIO=${AUTO_START_RADIO:-false}
+
+      # Ses çıkış sürücüsü (host PipeWire-Pulse)
+      - AUDIO_OUTPUT=${AUDIO_OUTPUT:-pulse}
+
+      # Ses seviyesi (yüzde 0-100)
+      - DEFAULT_VOLUME=${DEFAULT_VOLUME:-30}
+
+      # Host'ta PipeWire'ı çalıştıran kullanıcının UID'si (id -u)
+      - HOST_UID=${HOST_UID:-1000}
+      - PULSE_SERVER=unix:/run/host-user/${HOST_UID:-1000}/pulse/native
+
+    volumes:
+      # Host Bluetooth D-Bus soketi (bluetoothctl yönetimi için zorunludur)
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+
+      # Host kullanıcısının PipeWire-Pulse soketi (linger ile oturum açılmadan çalışır).
+      # rslave: açılışta /run/user/UID konteynerden sonra mount edilse bile görünür olur.
+      - type: bind
+        source: /run/user
+        target: /run/host-user
+        read_only: true
+        bind:
+          propagation: rslave
+
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:$${PORT:-8836}/api/status || exit 1" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

@@ -1,0 +1,17 @@
+# Yerel yapılandırma (MAC adresi, UID vb. kişisel ayarlar içerir)
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editör / sistem
+.vscode/
+.idea/
+.claude/
+*.swp
+.DS_Store

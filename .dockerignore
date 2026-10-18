@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+*.env
+**/__pycache__
+**/*.py[cod]
+.vscode
+.idea
+.claude
+README.md
+LICENSE
+portainer-stack.yml
+host-setup.sh

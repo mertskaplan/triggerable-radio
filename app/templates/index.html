@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Triggerable Radio — Ev Sunucusu Radyo Kontrolü</title>
+  <meta name="description" content="Ev sunucusu için REST GET istekleriyle kontrol edilebilen, otomatik Bluetooth yeniden bağlanmalı radyo çalıcı.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <!-- Ambient background lighting glows -->
+  <div class="ambient-glow glow-cyan"></div>
+  <div class="ambient-glow glow-purple"></div>
+  <div class="ambient-glow glow-emerald"></div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-group">
+        <div class="brand-icon-wrapper">
+          <svg class="radio-tower-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
+            <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
+            <circle cx="12" cy="12" r="2"/>
+            <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/>
+            <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/>
+          </svg>
+          <span class="live-pulse-dot" id="headerPulseDot"></span>
+        </div>
+        <div>
+          <h1 class="brand-title">Triggerable Radio</h1>
+          <p class="brand-subtitle">Ev Sunucusu Radyo & Bluetooth A2DP Kontrol Merkezi</p>
+        </div>
+      </div>
+
+      <div class="header-badges">
+        <div class="chip chip-port">
+          <span class="chip-label">PORT</span>
+          <span class="chip-val">{{ port }}</span>
+        </div>
+        <a href="/docs" target="_blank" class="chip chip-link" title="Swagger API Dokümantasyonu">
+          <span>API Docs</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+          </svg>
+        </a>
+      </div>
+    </header>
+
+    <!-- Main Grid -->
+    <main class="dashboard-grid">
+      <!-- Player Card -->
+      <section class="card player-card">
+        <div class="card-header">
+          <div class="station-meta">
+            <span class="station-badge">CANLI YAYIN İSTASYONU</span>
+            <h2 class="station-name">Radyo İLEF</h2>
+            <p class="station-desc">Ankara Üniversitesi İletişim Fakültesi Radyosu</p>
+          </div>
+          <div class="status-indicator-pill" id="radioStatusPill">
+            <span class="status-orb"></span>
+            <span class="status-text" id="radioStatusText">Yükleniyor...</span>
+          </div>
+        </div>
+
+        <!-- Audio Visualizer Canvas -->
+        <div class="visualizer-wrapper">
+          <canvas id="visualizerCanvas" width="600" height="90"></canvas>
+          <div class="visualizer-overlay" id="visualizerOverlay">
+            <span class="overlay-text">Radyo Durduruldu</span>
+          </div>
+        </div>
+
+        <!-- Player Controls -->
+        <div class="player-controls">
+          <button id="mainToggleBtn" class="play-btn" onclick="toggleRadio()">
+            <div class="play-btn-inner">
+              <svg id="playIcon" class="icon-play" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+              <svg id="stopIcon" class="icon-stop hidden" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2"/>
+              </svg>
+            </div>
+            <span id="mainBtnText" class="btn-caption">Radyoyu Başlat</span>
+          </button>
+
+          <!-- Volume Controls -->
+          <div class="volume-container">
+            <div class="volume-header">
+              <span class="volume-label">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+                Ses Seviyesi
+              </span>
+              <span class="volume-value" id="volumeValue">{{ volume }}%</span>
+            </div>
+            <input type="range" id="volumeSlider" min="0" max="100" value="{{ volume }}" oninput="updateVolume(this.value)">
+          </div>
+        </div>
+
+        <!-- Stream Format Details -->
+        <div class="stream-details">
+          <div class="stream-row">
+            <span class="stream-label">Kullanılan Doğrudan Akış (MP3):</span>
+            <a href="{{ stream_url }}" target="_blank" class="stream-url-link" title="Doğrudan MP3 Akış Bağlantısı">
+              {{ stream_url }}
+            </a>
+          </div>
+          <div class="stream-row text-muted">
+            <span class="stream-label">Alternatif Playlist (M3U):</span>
+            <a href="{{ m3u_url }}" target="_blank" class="stream-url-link secondary">
+              {{ m3u_url }}
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bluetooth Card -->
+      <section class="card bluetooth-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-icon bt-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="card-title">Bluetooth Hoparlör</h3>
+              <p class="card-subtitle">Otomatik Yeniden Bağlanma Servisi (Watchdog)</p>
+            </div>
+          </div>
+          <button id="reconnectBtBtn" class="btn btn-secondary btn-sm" onclick="reconnectBluetooth()">
+            <svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            <span>Şimdi Bağlan</span>
+          </button>
+        </div>
+
+        <div class="bt-info-body">
+          <div class="bt-status-row">
+            <span class="bt-status-label">Bağlantı Durumu:</span>
+            <div class="bt-status-tag" id="btStatusTag">
+              <span class="status-orb" id="btOrb"></span>
+              <span id="btStatusText">Kontrol ediliyor...</span>
+            </div>
+          </div>
+
+          <div class="bt-device-info">
+            <div class="info-block">
+              <span class="info-title">Hedef Cihaz MAC Adresi</span>
+              <div class="mac-display">
+                <code id="macAddressText">{{ bt_mac }}</code>
+                <button class="copy-chip-btn" onclick="copyToClipboard('{{ bt_mac }}', 'MAC adresi kopyalandı!')" title="Kopyala">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="info-block">
+              <span class="info-title">Cihaz İsmi</span>
+              <div class="device-name-display" id="btDeviceName">{{ bt_device_name }}</div>
+            </div>
+          </div>
+
+          <div class="bt-feature-note">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>Konteyner açıldığında hoparlöre otomatik bağlanır. Bağlantı koptuğunda sistem her 5 saniyede bir kesintisiz tekrar bağlanmayı dener.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- REST API & Automation Endpoints Guide -->
+      <section class="card api-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-icon api-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="card-title">REST GET İstekleri & Entegrasyon</h3>
+              <p class="card-subtitle">Home Assistant, cron, script veya tarayıcı ile tetikleyin</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="endpoint-list">
+          <!-- Start Endpoint -->
+          <div class="endpoint-item">
+            <div class="endpoint-left">
+              <span class="http-badge get">GET</span>
+              <code class="endpoint-path">/radio/start</code>
+              <span class="endpoint-desc">Radyoyu Başlatır (200 <code>active</code>)</span>
+            </div>
+            <div class="endpoint-actions">
+              <button class="btn btn-xs btn-outline" onclick="testEndpoint('/radio/start')">Test Et</button>
+              <button class="btn btn-xs btn-copy" onclick="copyEndpointCurl('/radio/start')">cURL</button>
+            </div>
+          </div>
+
+          <!-- Stop Endpoint -->
+          <div class="endpoint-item">
+            <div class="endpoint-left">
+              <span class="http-badge get">GET</span>
+              <code class="endpoint-path">/radio/stop</code>
+              <span class="endpoint-desc">Radyoyu Durdurur (200 <code>closed</code>)</span>
+            </div>
+            <div class="endpoint-actions">
+              <button class="btn btn-xs btn-outline" onclick="testEndpoint('/radio/stop')">Test Et</button>
+              <button class="btn btn-xs btn-copy" onclick="copyEndpointCurl('/radio/stop')">cURL</button>
+            </div>
+          </div>
+
+          <!-- Status Endpoint -->
+          <div class="endpoint-item">
+            <div class="endpoint-left">
+              <span class="http-badge get">GET</span>
+              <code class="endpoint-path">/radio/status</code>
+              <span class="endpoint-desc">Çalıyorsa <b>200</b> (<code>active</code>), çalmıyorsa <b>404</b> (<code>closed</code>)</span>
+            </div>
+            <div class="endpoint-actions">
+              <button class="btn btn-xs btn-outline" onclick="testEndpoint('/radio/status')">Test Et</button>
+              <button class="btn btn-xs btn-copy" onclick="copyEndpointCurl('/radio/status')">cURL</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Test result box -->
+        <div id="endpointResultBox" class="endpoint-result-box hidden">
+          <div class="result-header">
+            <span class="result-title" id="resultEndpointTitle">Test Sonucu</span>
+            <button class="result-close-btn" onclick="closeResultBox()">&times;</button>
+          </div>
+          <div class="result-body">
+            <div class="result-row"><span class="label">Durum Kodu:</span> <span class="badge" id="resultStatusBadge">200</span></div>
+            <div class="result-row"><span class="label">Dönen Yanıt:</span> <code id="resultBodyCode">active</code></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Logs / Events Card -->
+      <section class="card logs-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-icon terminal-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 17 10 11 4 5"></polyline>
+                <line x1="12" y1="19" x2="20" y2="19"></line>
+              </svg>
+            </div>
+            <div>
+              <h3 class="card-title">Canlı Olay Günlüğü</h3>
+              <p class="card-subtitle">Bluetooth ve oynatıcı arka plan günlükleri</p>
+            </div>
+          </div>
+          <span class="live-dot-pulse"></span>
+        </div>
+
+        <div class="logs-container" id="logsContainer">
+          <div class="log-placeholder">Günlükler yükleniyor...</div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Triggerable Radio &bull; Docker Containerized &bull; Python & mpv & BlueZ</p>
+    </footer>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastNotification" class="toast hidden">
+    <span id="toastMessage"></span>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
