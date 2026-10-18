@@ -1,5 +1,7 @@
 # 📻 Triggerable Radio
 
+[![Docker Hub](https://img.shields.io/docker/v/mertskaplan/triggerable-radio?label=Docker%20Hub&sort=semver)](https://hub.docker.com/r/mertskaplan/triggerable-radio) [![Lisans: GPL v3](https://img.shields.io/badge/Lisans-GPLv3-blue.svg)](LICENSE)
+
 Ev sunucunuzda (Ubuntu / Debian tabanlı herhangi bir sistemde) Docker üzerinde çalışan, belirli **HTTP GET** istekleriyle kontrol edilebilen, **Bluetooth A2DP hoparlöre otomatik bağlanan** ve bağlantı koptuğunda kesintisiz yeniden bağlanmayı deneyen modern radyo çalma uygulaması.
 
 ---
@@ -44,7 +46,7 @@ triggerable-radio/
 │       └── index.html      # Web kontrol paneli şablonu
 ├── Dockerfile              # BlueZ, mpv, pactl ve Python ortamı
 ├── docker-compose.yml      # Docker Compose dosyası (imajı kaynaktan derler)
-├── portainer-stack.yml     # Portainer Web editor için stack dosyası (önceden derlenmiş imaj)
+├── portainer-stack.yml     # Docker Hub imajını kullanan stack dosyası (Portainer Web editor)
 ├── host-setup.sh           # Host sunucu kurulum betiği (ilk kurulumda BİR KEZ çalıştırılır)
 ├── .env.example            # Örnek yapılandırma dosyası (.env olarak kopyalanır)
 ├── .env                    # Yerel ayarlar (git'e gönderilmez)
@@ -98,6 +100,7 @@ nano .env   # En azından BT_DEVICE_MAC değerini kendi hoparlörünüze göre a
 | `AUTO_START_RADIO` | `false` | Konteyner başlar başlamaz radyonun çalması |
 | `AUDIO_OUTPUT` | `pulse` | mpv ses çıkış sürücüsü |
 | `DEFAULT_VOLUME` | `30` | Hoparlörün açılıştaki ses seviyesi (yüzde 0-100). Sonrasında hoparlörün düğmeleriyle değiştirilebilir |
+| `IMAGE_TAG` | `latest` | Docker Hub imaj sürümü (yalnızca `portainer-stack.yml`) |
 | `HOST_UID` | `1000` | Host'ta PipeWire'ı çalıştıran kullanıcının UID'si (`id -u`). `host-setup.sh` otomatik yazar |
 
 ### 3. Host Kurulumu (Bir Kez Yapılır)
@@ -142,7 +145,14 @@ ls -l /run/user/$(id -u)/pulse/native                     # PipeWire-Pulse soket
 
 ### 5. Konteyneri Başlatın
 
-Komut satırından:
+Hazır imajı Docker Hub'dan çekerek (önerilen):
+
+```bash
+docker compose -f portainer-stack.yml --env-file .env up -d
+docker compose -f portainer-stack.yml logs -f
+```
+
+Ya da imajı kaynaktan derleyerek:
 
 ```bash
 docker compose up -d --build
@@ -294,14 +304,9 @@ docker run -d --name portainer --restart=always \
 
 Ardından `https://<SUNUCU_IP>:9443` adresinden yönetici hesabını oluşturun ve **local** ortamı seçin. Stack iki yöntemle kurulabilir:
 
-### Yöntem A — Web editor (Git deposu gerekmez)
+### Yöntem A — Web editor (Docker Hub imajı, önerilen)
 
-Web editor'de proje dosyaları bulunmadığından imaj Portainer içinde derlenemez. Bu yüzden imajı önce hedef cihazda derleyin:
-
-```bash
-cd triggerable-radio
-docker build -t triggerable-radio:latest .
-```
+Hazır imaj [Docker Hub](https://hub.docker.com/r/mertskaplan/triggerable-radio)'dan çekilir; hedef cihazda derleme gerekmez.
 
 1. **Stacks** → **Add stack**
 2. **Name**: `triggerable-radio`
@@ -314,14 +319,14 @@ docker build -t triggerable-radio:latest .
    BT_DEVICE_MAC=AA:BB:CC:DD:EE:FF
    ```
 
-   `HOST_UID` değerini hedef cihazda `id -u` ile öğrenin (`host-setup.sh` de kurulum sonunda yazdırır).
+   `HOST_UID` değerini hedef cihazda `id -u` ile öğrenin (`host-setup.sh` de kurulum sonunda yazdırır). Belirli bir sürüme sabitlemek için `IMAGE_TAG=1.0` ekleyebilirsiniz (varsayılan: `latest`).
 6. **Deploy the stack**
 
-> Kodu güncellediğinizde imajı tekrar derleyin (`docker build -t triggerable-radio:latest .`) ve Portainer'da stack'i açıp **Update the stack** düğmesine basın.
+> Yeni sürüme geçmek için stack'i açıp **Update the stack** düğmesine basın ve **Re-pull image** seçeneğini işaretleyin.
 
-### Yöntem B — Repository (Git deposundan)
+### Yöntem B — Repository (Git deposundan derleme)
 
-Portainer depoyu GitHub'dan çekip imajı kendisi derleyebilir:
+Portainer depoyu GitHub'dan çekip imajı kendisi derler:
 
 1. **Stacks** → **Add stack**
 2. **Name**: `triggerable-radio`

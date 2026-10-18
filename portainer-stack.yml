@@ -2,17 +2,13 @@
 # Triggerable Radio — Portainer Stack (Web editor)
 # ==========================================================
 # Bu dosya Portainer > Stacks > Add stack > Web editor için hazırlanmıştır.
-# Web editor'de kaynak dosyalar bulunmadığından imaj derlenemez; imaj önce
-# host'ta derlenmelidir:
-#   docker build -t triggerable-radio:latest .
+# İmaj derlenmez, Docker Hub'dan çekilir: mertskaplan/triggerable-radio
 # Değişkenler Portainer'daki "Environment variables" bölümünden verilir.
 # ==========================================================
 services:
   triggerable-radio:
     container_name: triggerable-radio
-    image: triggerable-radio:latest
-    # İmaj yalnızca yerelde bulunur; registry'den çekmeye çalışma
-    pull_policy: never
+    image: mertskaplan/triggerable-radio:${IMAGE_TAG:-latest}
     restart: unless-stopped
 
     # host network modu Bluetooth ve düşük gecikmeli ses için gereklidir

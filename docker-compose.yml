@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: triggerable-radio
-    image: triggerable-radio:latest
+    image: mertskaplan/triggerable-radio:latest
     restart: unless-stopped
 
     # host network modu Bluetooth ve düşük gecikmeli ses için gereklidir
